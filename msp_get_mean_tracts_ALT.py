@@ -37,7 +37,7 @@ from allel.stats.misc import jackknife
 # ta vector of admixture times from S2 and S3 to S1
 # f vector of admixture fractions from from S2 and S3 to S1
 # N vector of effective sizes in order of population numbers
-# L is length of simulated region in bases (set to 200MB here)
+# L is length of simulated region in bases (set to 100MB here)
 # 
 # Here we are looking at admixed segment length distributions, D tests, and % shared archaic SNP blocks between Ayta and Papuan for Neanderthal and Denisovan. The model we are testing is the Alt, with an admixture event from Neanderthal into the shared ancestor of all Non-Africans, a Denisovan admixture event into the ancestor of Papuans and Ayta, and a Denisovan admixture event private to Ayta.
 
@@ -132,7 +132,7 @@ pops = [msp.PopulationConfiguration(initial_size = n) for n in N]
 
 
 # create empty array to take results
-res_arr = np.zeros([10,7])
+res_arr = np.zeros([10,8])
 
 
 # In[ ]:
@@ -140,17 +140,22 @@ res_arr = np.zeros([10,7])
 # some functions
 
 # get records of all genuine migrating tracts
-def get_migrating_tracts(ts):
-    migrating_tracts_DEN1, migrating_tracts_DEN2, migrating_tracts_NEA = [], [], []
-    # Get all tracts that migrated into the Archaic populations
+def get_mig_tracts(ts):
+    mig_tracts_DEN_ayt, mig_tracts_DEN_pap, mig_tracts_NEA_ayt, mig_tracts_NEA_pap = [], [], [], []
+    # Get all tracts that migrated into the archaic populations
     for migration in ts.migrations():
-        if migration.dest == DEN1:
-            migrating_tracts_DEN1.append((migration.left, migration.right))
-        elif migration.dest == DEN2:
-            migrating_tracts_DEN2.append((migration.left, migration.right))
-        elif migration.dest == NEA:
-            migrating_tracts_NEA.append((migration.left, migration.right))
-    return np.array(migrating_tracts_DEN1), np.array(migrating_tracts_DEN2), np.array(migrating_tracts_NEA) 
+            if migration.dest == DEN1 or migration.dest == DEN2:
+                if 60 <= migration.node <= 69:
+                    mig_tracts_DEN_pap.append((migration.left, migration.right))
+                elif 70 <= migration.node <= 79:
+                    mig_tracts_DEN_ayt.append((migration.left, migration.right))
+            elif migration.dest == NEA:
+                if 60 <= migration.node <= 69:
+                    mig_tracts_NEA_pap.append((migration.left, migration.right))
+                elif 70 <= migration.node <= 79:
+                    mig_tracts_NEA_ayt.append((migration.left, migration.right))
+    return np.array(mig_tracts_DEN_ayt), np.array(mig_tracts_DEN_pap), np.array(mig_tracts_NEA_ayt), np.array(mig_tracts_NEA_pap)  
+
 
 # In[ ]:
 
@@ -161,10 +166,11 @@ for aRun in range(numRuns):
 
     sims = msp.simulate(samples=samples, Ne=N[0], population_configurations=pops, demographic_events=demography, mutation_rate=mu, length=L, recombination_rate=r, record_migrations=True, random_seed=seed)
 
-    mig_DEN1, mig_DEN2, mig_NEA = get_migrating_tracts(sims)
-    mean_tract_den1 = np.mean(mig_DEN1[:,1] - mig_DEN1[:,0], axis=0).astype(int)
-    mean_tract_den2 = np.mean(mig_DEN2[:,1] - mig_DEN2[:,0], axis=0).astype(int)
-    mean_tract_nea = np.mean(mig_NEA[:,1] - mig_NEA[:,0], axis=0).astype(int)
+    mig_tracts_DEN_AYT, mig_tracts_DEN_PAP, mig_tracts_NEA_AYT, mig_tracts_NEA_PAP  = get_mig_tracts(sims)
+    mean_tract_den_ayt = np.mean(mig_tracts_DEN_AYT[:,1] - mig_tracts_DEN_AYT[:,0], axis=0).astype(int)
+    mean_tract_den_pap = np.mean(mig_tracts_DEN_PAP[:,1] - mig_tracts_DEN_PAP[:,0], axis=0).astype(int)
+    mean_tract_nea_ayt = np.mean(mig_tracts_NEA_AYT[:,1] - mig_tracts_NEA_AYT[:,0], axis=0).astype(int)
+    mean_tract_nea_pap = np.mean(mig_tracts_NEA_PAP[:,1] - mig_tracts_NEA_PAP[:,0], axis=0).astype(int)
 
     ## Comparing putatively assigned "SNP tracts"
 
@@ -295,13 +301,13 @@ for aRun in range(numRuns):
 
     shared_NEA_PAPvsAET, putative_NEA_PAP, putative_NEA_AET = get_NEA_blocks(D3_res_PAP, D3_res_AET, D4_res_PAP, D4_res_AET)
 
-    res_arr[aRun] = D_mean_arr[0][0], D_mean_arr[1][0], shared_DEN_PAPvsAET, shared_NEA_PAPvsAET, mean_tract_den2, mean_tract_den1, mean_tract_nea
+    res_arr[aRun] = D_mean_arr[0][0], D_mean_arr[1][0], shared_DEN_PAPvsAET, shared_NEA_PAPvsAET, mean_tract_den_ayt, mean_tract_den_pap, mean_tract_nea_ayt, mean_tract_nea_pap
 
 
 # In[ ]:
 
 
-# function to return 2D array with dim0=(D_test_AET, D_test_PAP, %shared_DEN, %_shared_NEA, mean_tractL_DEN2, mean_tractL_DEN1, mean_tractL_NEA) & dim1 = (mean, stdev, marginoferror)
+# function to return 2D array with dim0=(D_test_AYT, D_test_PAP, %shared_DEN, %_shared_NEA, mean_tractL_DEN_ayt, mean_tractL_DEN_pap, mean_tractL_NEA_ayt, mean_tractL_NEA_pap) & dim1 = (mean, stdev, marginoferror)
 
 def get_means(samplearr, interval=0.95, method='z'):
     mean_vals = np.mean(samplearr, axis=0)
@@ -365,15 +371,15 @@ plt.savefig('plot_ALT_shared.pdf', dpi=600, bbox_inches='tight')
 # plot mean tract lengths
 
 def plot_mean_tract_lengths(res_array, title=None):
-    x = ['Aeta','Papuan','Neanderthal']
-    y = res_array[4:7,0]
-    sterr = res_array[4:7,2]
+    x = ['Denisovan in Ayta','Denisovan in Papuan','Neanderthal in Ayta','Neanderthal in Papuan']
+    y = res_array[4:8,0]
+    sterr = res_array[4:8,2]
     fig, ax = plt.subplots(figsize=(9, 8))
     sns.despine(ax=ax, offset=10)
     ax.errorbar(x, y, yerr=sterr)
-#    ax.set(ylim=(0, 25))
     ax.set_xlabel('Archaic Tracts')
     ax.set_ylabel('Mean tract length')
+    ax.set_ylim(10000,45000)
     if title:
         ax.set_title(title)     
 
