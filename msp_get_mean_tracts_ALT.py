@@ -323,7 +323,7 @@ def get_means(samplearr, interval=0.95, method='z'):
     return out_arr
 
 mean_res = get_means(res_arr)
-
+np.savetxt('mean_res_ALT.txt', mean_res)
 
 # In[ ]:
 
